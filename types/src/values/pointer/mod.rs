@@ -1,45 +1,19 @@
+mod inner;
+mod weak;
+
 use std::{
-    cell::{Ref, RefCell, RefMut},
     collections::HashSet,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
+    ptr,
     rc::Rc
 };
 
 use crate::{ValueHandle, ValueHandleMut};
-
 use super::Value;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InnerValue(Rc<RefCell<Value>>);
-
-impl InnerValue {
-    #[inline(always)]
-    pub fn new(value: Value) -> Self {
-        InnerValue(Rc::new(RefCell::new(value)))
-    }
-
-    #[inline(always)]
-    pub fn borrow<'a>(&'a self) -> Ref<'a, Value> {
-        self.0.borrow()
-    }
-
-    #[inline(always)]
-    pub fn borrow_mut<'a>(&'a self) -> RefMut<'a, Value> {
-        self.0.borrow_mut()
-    }
-
-    #[inline(always)]
-    pub fn into_inner(self) -> Rc<RefCell<Value>> {
-        self.0
-    }
-}
-
-impl Hash for InnerValue {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.borrow().hash_with_tracked_pointers(state, &mut HashSet::new());
-    }
-}
+pub use inner::InnerValue;
+pub use weak::WeakValue;
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum ValuePointerInner {
@@ -60,6 +34,10 @@ impl Default for ValuePointerInner {
 pub struct ValuePointer(ValuePointerInner);
 
 impl ValuePointer {
+    pub fn from(value: InnerValue) -> Self {
+        Self(ValuePointerInner::Shared(value))
+    }
+
     #[inline(always)]
     pub fn owned(value: Value) -> Self {
         Self(ValuePointerInner::Owned(Box::new(value)))
@@ -68,6 +46,37 @@ impl ValuePointer {
     #[inline(always)]
     pub fn shared(value: InnerValue) -> Self {
         Self(ValuePointerInner::Shared(value))
+    }
+
+    #[inline(always)]
+    pub fn get_value_ptr(&self) -> *const Value {
+        ptr::from_ref(self.handle().as_value())
+    }
+
+    pub fn weak(&mut self) -> WeakValue {
+        match &mut self.0 {
+            ValuePointerInner::Owned(v) => {
+                let dst = std::mem::take(v);
+                let shared = InnerValue::new(*dst);
+                let weak = shared.downgrade();
+                self.0 = ValuePointerInner::Shared(shared);
+
+                weak
+            },
+            ValuePointerInner::Shared(v) => v.downgrade()
+        }
+    }
+
+    pub fn shareable(&mut self) -> Self {
+        match &mut self.0 {
+            ValuePointerInner::Owned(v) => {
+                let dst = std::mem::take(v);
+                let shared = InnerValue::new(*dst);
+                self.0 = ValuePointerInner::Shared(shared.clone());
+                ValuePointer::shared(shared)
+            },
+            ValuePointerInner::Shared(v) => ValuePointer::shared(v.clone())
+        }
     }
 }
 
@@ -120,11 +129,25 @@ impl Hash for ValuePointer {
 
 impl Drop for ValuePointer {
     fn drop(&mut self) {
+        let self_pointer = self.get_value_ptr();
+
         let mut stack = vec![self.into_inner()];
+        let new_pointer = self.get_value_ptr();
+        assert_ne!(self_pointer, new_pointer);
+
+        // We need to prevent any stackoverflow that could happen due to the recursive reference cyles
+        let mut visited = HashSet::new();
+
         while let Some(value) = stack.pop() {
             match value {
                 Value::Map(map) => {
-                    stack.extend(map.into_iter().flat_map(|(k, mut v)| vec![k, v.into_inner()]));
+                    for (k, mut v) in map {
+                        stack.push(k);
+
+                        if visited.insert(v.get_value_ptr()) {
+                            stack.push(v.into_inner());
+                        }
+                    }
                 },
                 Value::Array(array) => {
                     stack.extend(array.into_iter().map(|mut v| v.into_inner()));

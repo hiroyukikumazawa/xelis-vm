@@ -5,27 +5,27 @@ use crate::{
     Context,
     VMError
 };
-use xelis_types::{Value, Type, Path};
+use xelis_types::{path_as_ref, path_as_mut, Path, Type, Value, ValueError};
 
 use super::InstructionResult;
 
 macro_rules! op {
     ($a: expr, $b: expr, $op: tt) => {{
-        match ($a.as_value(), $b.as_value()) {
+        match ($a, $b) {
             (Value::U8(a), Value::U8(b)) => Value::U8(a $op b),
             (Value::U16(a), Value::U16(b)) => Value::U16(a $op b),
             (Value::U32(a), Value::U32(b)) => Value::U32(a $op b),
             (Value::U64(a), Value::U64(b)) => Value::U64(a $op b),
             (Value::U128(a), Value::U128(b)) => Value::U128(a $op b),
             (Value::U256(a), Value::U256(b)) => Value::U256(*a $op *b),
-            (a, b) => return Err(VMError::IncompatibleValues(a.clone(), b.clone()))
+            _ => return Err(VMError::IncompatibleValues)
         }
     }};
 }
 
 macro_rules! op_bool {
     ($a: expr, $b: expr, $op: tt) => {{
-        match ($a.as_value(), $b.as_value()) {
+        match ($a, $b) {
             (Value::Boolean(a), Value::Boolean(b)) => Value::Boolean(a $op b),
             (Value::U8(a), Value::U8(b)) => Value::Boolean(a $op b),
             (Value::U16(a), Value::U16(b)) => Value::Boolean(a $op b),
@@ -33,7 +33,7 @@ macro_rules! op_bool {
             (Value::U64(a), Value::U64(b)) => Value::Boolean(a $op b),
             (Value::U128(a), Value::U128(b)) => Value::Boolean(a $op b),
             (Value::U256(a), Value::U256(b)) => Value::Boolean(a $op b),
-            (a, b) => return Err(VMError::IncompatibleValues(a.clone(), b.clone()))
+            _ => return Err(VMError::IncompatibleValues)
         }
     }};
 }
@@ -44,7 +44,11 @@ macro_rules! opcode_op {
             let right = $self.pop_stack()?;
             let left = $self.pop_stack()?;
             // Push the result to the stack, no need to check as we poped 2 values
-            $self.push_stack_unchecked(Path::Owned($macr!(left.as_ref(), right.as_ref(), $op)));
+            path_as_ref!(left, left, {
+                path_as_ref!(right, right, {
+                    $self.push_stack_unchecked(Path::Owned($macr!(left, right, $op)));
+                });
+            });
         }
     };
 }
@@ -54,8 +58,12 @@ macro_rules! opcode_op_assign {
         {
             let right = $self.pop_stack()?;
             let mut left = $self.pop_stack()?;
-            let result = $macr!(left.as_ref(), right.as_ref(), $op);
-            *left.as_mut() = result;
+            path_as_mut!(&mut left, v, {
+                let result: Value = path_as_ref!(right, right, {
+                    $macr!(&v, right, $op)
+                });
+                *v = result;
+            });
         }
     };
 }
@@ -94,15 +102,15 @@ opcode_fn!(shl_assign, opcode_op_assign, op, <<);
 opcode_fn!(shr_assign, opcode_op_assign, op, >>);
 
 pub fn neg<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, _: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
-    let value = stack.pop_stack()?;
-    stack.push_stack_unchecked(Path::Owned(Value::Boolean(!value.as_bool()?)));
+    let value = path_as_ref!(stack.pop_stack()?, value, value.as_bool()?);
+    stack.push_stack_unchecked(Path::Owned(Value::Boolean(!value)));
     Ok(InstructionResult::Nothing)
 }
 
 pub fn assign<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, _: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let right = stack.pop_stack()?;
     let mut left = stack.pop_stack()?;
-    *left.as_mut() = right.into_owned();
+    left.assign(right.into_owned())?;
     Ok(InstructionResult::Nothing)
 }
 
@@ -116,7 +124,7 @@ pub fn pow<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, _: &mut ChunkManager<'a>,
         (Value::U64(a), Value::U64(b)) => Value::U64(a.pow(b as u32)),
         (Value::U128(a), Value::U128(b)) => Value::U128(a.pow(b as u32)),
         (Value::U256(a), Value::U256(b)) => Value::U256(a.pow(b.into())),
-        (a, b) => return Err(VMError::IncompatibleValues(a.clone(), b.clone()))
+        _ => return Err(VMError::IncompatibleValues)
     };
     stack.push_stack_unchecked(Path::Owned(result));
     Ok(InstructionResult::Nothing)
@@ -144,8 +152,8 @@ pub fn cast<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManag
 
 pub fn and<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, _: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let value = stack.pop_stack()?;
-    let value = value.as_bool()?;
-    let value = value && stack.pop_stack()?.as_bool()?;
+    let value = path_as_ref!(value, value, value.as_bool()?);
+    let value = value && path_as_ref!(stack.pop_stack()?, value, value.as_bool()?);
     stack.push_stack_unchecked(Path::Owned(Value::Boolean(value)));
 
     Ok(InstructionResult::Nothing)
@@ -154,7 +162,7 @@ pub fn and<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, _: &mut ChunkManager<'a>,
 pub fn or<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, _: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let right = stack.pop_stack()?;
     let left = stack.pop_stack()?;
-    let value = left.as_bool()? || right.as_bool()?;
+    let value = path_as_ref!(left, value, value.as_bool()?) || path_as_ref!(right, value, value.as_bool()?);
     stack.push_stack_unchecked(Path::Owned(Value::Boolean(value)));
 
     Ok(InstructionResult::Nothing)
@@ -162,12 +170,12 @@ pub fn or<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, _: &mut ChunkManager<'a>, 
 
 pub fn increment<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, _: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let v = stack.last_mut_stack()?;
-    v.as_mut().increment()?;
+    path_as_mut!(v, value, value.increment()?);
     Ok(InstructionResult::Nothing)
 }
 
 pub fn decrement<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, _: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let v = stack.last_mut_stack()?;
-    v.as_mut().decrement()?;
+    path_as_mut!(v, value, value.decrement()?);
     Ok(InstructionResult::Nothing)
 }

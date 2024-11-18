@@ -723,7 +723,6 @@ mod tests {
             let mut inner_map = HashMap::new();
             inner_map.insert(Value::U8(10), ValuePointer::owned(map));
             map = Value::Map(inner_map);
-            // println!("Map size: {}", map.get_memory_usage(0));
         }
     }
 }

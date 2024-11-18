@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use xelis_types::Path;
+use xelis_types::{path_as_mut, Path, ValueError};
 
 use crate::{stack::Stack, Backend, ChunkManager, Context, VMError};
 use super::InstructionResult;
@@ -15,8 +15,8 @@ pub fn constant<'a>(backend: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut 
 pub fn memory_load<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let index = manager.read_u16()?;
     let value = manager.from_register(index as usize)?
-        .shareable();
-    stack.push_stack(value)?;
+        .weak();
+    stack.push_stack(Path::Wrapper(value))?;
 
     Ok(InstructionResult::Nothing)
 }
@@ -24,7 +24,7 @@ pub fn memory_load<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut Chu
 pub fn memory_set<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let index = manager.read_u16()?;
     let value = stack.pop_stack()?;
-    manager.set_register(index as usize, value);
+    manager.set_register(index as usize, value.into_pointer());
 
     Ok(InstructionResult::Nothing)
 }
@@ -109,12 +109,17 @@ pub fn syscall<'a>(backend: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut C
     let f = backend.environment.get_functions().get(id as usize)
         .ok_or(VMError::UnknownSysCall)?;
 
-    let mut instance = match on_value.as_mut() {
-        Some(v) => Some(v.as_mut()),
-        None => None,
+    let args = arguments.into();
+    let result = match on_value.as_mut() {
+        Some(v) => {
+            path_as_mut!(v, value, {
+                f.call_function(Some(value), args, context)?
+            })
+        }
+        None => f.call_function(None, args, context)?,
     };
 
-    if let Some(v) = f.call_function(instance.as_deref_mut(), arguments.into(), context)? {
+    if let Some(v) = result {
         stack.push_stack(Path::Owned(v))?;
     }
 

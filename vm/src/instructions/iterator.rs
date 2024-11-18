@@ -6,19 +6,25 @@ use crate::{
     Context,
     VMError
 };
-use xelis_types::{Value, Path};
+use xelis_types::{
+    Value,
+    ValueError,
+    Path,
+    path_as_ref
+};
 
 use super::InstructionResult;
 
 pub fn iterable_length<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, _: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let value = stack.pop_stack()?;
-    let len = value.as_ref().as_vec()?.len();
+    let len = path_as_ref!(value, v, v.as_vec()?.len());
     stack.push_stack_unchecked(Path::Owned(Value::U32(len as u32)));
     Ok(InstructionResult::Nothing)
 }
 
 pub fn iterator_begin<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
-    let value = stack.pop_stack()?;
+    let value = stack.pop_stack()?
+        .into_pointer();
     let iterator = PathIterator::new(value)?;
     manager.add_iterator(iterator);
     Ok(InstructionResult::Nothing)

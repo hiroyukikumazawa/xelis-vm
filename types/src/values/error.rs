@@ -26,4 +26,6 @@ pub enum ValueError {
     InvalidPrimitiveType,
     #[error("Invalid unknown type")]
     UnknownType,
+    #[error("weak value is dropped")]
+    WeakValue,
 }

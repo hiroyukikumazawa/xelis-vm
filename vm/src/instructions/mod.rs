@@ -9,6 +9,7 @@ use iterator::*;
 use constructor::*;
 
 use xelis_bytecode::OpCode;
+use xelis_types::{Path, ValueError, path_as_ref};
 
 use crate::Context;
 
@@ -145,7 +146,7 @@ fn jump<'a>(_: &Backend<'a>, _: &mut Stack<'a>, manager: &mut ChunkManager<'a>, 
 fn jump_if_false<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let addr = manager.read_u32()?;
     let value = stack.pop_stack()?;
-    if !value.as_bool()? {
+    if !path_as_ref!(value, value, value.as_bool()?) {
         manager.set_index(addr as usize);
     }
     Ok(InstructionResult::Nothing)

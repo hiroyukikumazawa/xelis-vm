@@ -1,0 +1,52 @@
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    collections::HashSet,
+    hash::{Hash, Hasher},
+    rc::Rc
+};
+use crate::Value;
+
+use super::weak::WeakValue;
+
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InnerValue(Rc<RefCell<Value>>);
+
+impl InnerValue {
+    #[inline(always)]
+    pub fn new(value: Value) -> Self {
+        Self(Rc::new(RefCell::new(value)))
+    }
+
+    #[inline(always)]
+    pub fn from(value: Rc<RefCell<Value>>) -> Self {
+        Self(value)
+    }
+
+    #[inline(always)]
+    pub fn borrow<'a>(&'a self) -> Ref<'a, Value> {
+        self.0.borrow()
+    }
+
+    #[inline(always)]
+    pub fn borrow_mut<'a>(&'a self) -> RefMut<'a, Value> {
+        self.0.borrow_mut()
+    }
+
+    #[inline(always)]
+    pub fn into_inner(self) -> Rc<RefCell<Value>> {
+        self.0
+    }
+
+    #[inline(always)]
+    pub fn downgrade(&self) -> WeakValue {
+        WeakValue::new(Rc::downgrade(&self.0))
+    }
+}
+
+
+impl Hash for InnerValue {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.borrow().hash_with_tracked_pointers(state, &mut HashSet::new());
+    }
+}
