@@ -1,52 +1,74 @@
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    collections::HashSet,
-    hash::{Hash, Hasher},
-    rc::Rc
-};
-use crate::Value;
+use std::rc::Rc;
 
-use super::weak::WeakValue;
+use crate::{Value, ValueHandle, ValueHandleMut};
+use super::{SubValue, ValuePointer};
 
+#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+pub enum ValuePointerInner {
+    Owned(Box<Value>),
+    Shared(SubValue)
+}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InnerValue(Rc<RefCell<Value>>);
-
-impl InnerValue {
-    #[inline(always)]
-    pub fn new(value: Value) -> Self {
-        Self(Rc::new(RefCell::new(value)))
-    }
-
-    #[inline(always)]
-    pub fn from(value: Rc<RefCell<Value>>) -> Self {
-        Self(value)
-    }
-
-    #[inline(always)]
-    pub fn borrow<'a>(&'a self) -> Ref<'a, Value> {
-        self.0.borrow()
-    }
-
-    #[inline(always)]
-    pub fn borrow_mut<'a>(&'a self) -> RefMut<'a, Value> {
-        self.0.borrow_mut()
-    }
-
-    #[inline(always)]
-    pub fn into_inner(self) -> Rc<RefCell<Value>> {
-        self.0
-    }
-
-    #[inline(always)]
-    pub fn downgrade(&self) -> WeakValue {
-        WeakValue::new(Rc::downgrade(&self.0))
+impl Default for ValuePointerInner {
+    fn default() -> Self {
+        Self::Owned(Box::new(Value::Null))
     }
 }
 
+impl ValuePointerInner {
+    // Convert into a owned value
+    // Take the value from the Rc
+    // if it can't be taken, replace it by Value::Null
+    pub fn into_inner(self) -> Value {
+        match self {
+            Self::Owned(v) => *v,
+            Self::Shared(v) => match Rc::try_unwrap(v.into_inner()) {
+                Ok(value) => value.into_inner(),
+                Err(rc) => {
+                    let mut value = rc.borrow_mut();
+                    std::mem::take(&mut value)
+                }
+            }
+        }
+    }
 
-impl Hash for InnerValue {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.borrow().hash_with_tracked_pointers(state, &mut HashSet::new());
+    // Clone the Rc value to fully own it
+    pub fn into_ownable(self) -> ValuePointer {
+        ValuePointer(match self {
+            Self::Owned(_) => self,
+            Self::Shared(v) => Self::Owned(Box::new(match Rc::try_unwrap(v.into_inner()) {
+                Ok(value) => value.into_inner(),
+                Err(rc) => rc.borrow().clone()
+            }))
+        })
+    }
+
+    // Transform the value into a shared value
+    pub fn transform(&mut self) -> ValuePointer {
+        ValuePointer(match self {
+            Self::Owned(v) => {
+                let dst = std::mem::replace(v, Box::new(Value::Null));
+                let shared = Self::Shared(SubValue::new(*dst));
+                *self = shared.clone();
+                shared
+            },
+            Self::Shared(v) => Self::Shared(v.clone())
+        })
+    }
+
+    // Wrap the value into an handle to be casted to a reference of the value
+    pub fn handle<'a>(&'a self) -> ValueHandle<'a> {
+        match self {
+            Self::Owned(v) => ValueHandle::Borrowed(v),
+            Self::Shared(v) => ValueHandle::Ref(v.borrow())
+        }
+    }
+
+    // Wrap the value into an handle to be casted to a mutable reference of the value
+    pub fn handle_mut<'a>(&'a mut self) -> ValueHandleMut<'a> {
+        match self {
+            Self::Owned(v) => ValueHandleMut::Borrowed(v),
+            Self::Shared(v) => ValueHandleMut::RefMut(v.borrow_mut())
+        }
     }
 }

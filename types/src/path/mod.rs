@@ -89,8 +89,7 @@ impl<'a> Path<'a> {
                     .get(index)
                     .ok_or_else(|| ValueError::OutOfBounds(index, len))?;
 
-                // TODO
-                Ok(Path::Wrapper(at_index.clone().weak()))
+                Ok(Path::Owned(at_index.to_value()))
             },
             Self::Wrapper(v) => {
                 let mut pointer = v.upgrade().ok_or(ValueError::WeakValue)?;

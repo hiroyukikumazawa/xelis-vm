@@ -4,7 +4,7 @@ use std::{
 };
 use crate::Value;
 
-use super::{InnerValue, ValuePointer};
+use super::{SubValue, ValuePointer};
 
 
 #[derive(Debug, Clone)]
@@ -18,6 +18,6 @@ impl WeakValue {
 
     #[inline(always)]
     pub fn upgrade<'a>(&'a self) -> Option<ValuePointer> {
-        self.0.upgrade().map(|v| ValuePointer::from(InnerValue::from(v)))
+        self.0.upgrade().map(|v| ValuePointer::from(SubValue::from(v)))
     }
 }

@@ -700,17 +700,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_stackoverflow_std_hash() {
+    fn test_stackoverflow_std_hash_and_drop() {
         // Create a map that contains itself
-        let map = InnerValue::new(Value::Map(HashMap::new()));
+        // During a drop, without a custom implementation
+        // this will stackoverflow
+        let mut map = ValuePointer::owned(Value::Map(HashMap::new()));
         let cloned = {
-            let mut m = map.borrow_mut();
+            let clone = map.transform();
+            assert_eq!(clone.get_value_ptr(), map.get_value_ptr());
+
+            let mut m = map.handle_mut();
             m.as_mut_map()
             .unwrap()
-            .insert(Value::U8(10), ValuePointer::shared(map.clone()));
+            .insert(Value::U8(10), clone);
             m.clone()
         };
 
+        // Add the previous map as a key to current map,
+        // this will need to hash the infinite map due to the cyclic reference
         let mut inner_map: HashMap<Value, ValuePointer> = HashMap::new();
         inner_map.insert(cloned, ValuePointer::owned(Value::U8(10)));
     }
