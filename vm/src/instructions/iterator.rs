@@ -8,7 +8,6 @@ use crate::{
 };
 use xelis_types::{
     Value,
-    ValueError,
     Path,
     path_as_ref
 };

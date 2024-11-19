@@ -1,5 +1,5 @@
 use xelis_environment::{Context, EnvironmentError, FnInstance, FnParams, FnReturnType};
-use xelis_types::{Type, Value, ValuePointer};
+use xelis_types::{path_as_ref, Type, Value, ValuePointer};
 use paste::paste;
 
 use crate::EnvironmentBuilder;
@@ -57,16 +57,17 @@ fn contains(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnRe
     let zelf = zelf?;
     let (start, end, _type) = zelf.as_range()?;
 
-    let value = value.as_ref();
-    Ok(Some(match _type {
-        Type::U8 => contains!(u8, start, end, value),
-        Type::U16 => contains!(u16, start, end, value),
-        Type::U32 => contains!(u32, start, end, value),
-        Type::U64 => contains!(u64, start, end, value),
-        Type::U128 => contains!(u128, start, end, value),
-        Type::U256 => contains!(u256, start, end, value),
-        _ => return Err(EnvironmentError::InvalidType(zelf.clone()))
-    }))
+    path_as_ref!(value, v, {
+        Ok(Some(match _type {
+            Type::U8 => contains!(u8, start, end, v),
+            Type::U16 => contains!(u16, start, end, v),
+            Type::U32 => contains!(u32, start, end, v),
+            Type::U64 => contains!(u64, start, end, v),
+            Type::U128 => contains!(u128, start, end, v),
+            Type::U256 => contains!(u256, start, end, v),
+            _ => return Err(EnvironmentError::InvalidType(zelf.clone()))
+        }))
+    })
 }
 
 fn collect(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {

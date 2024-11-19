@@ -10,10 +10,10 @@ pub use handle::{
 macro_rules! path_as_ref {
     ($path: expr, $name: ident, $body: block) => {
         match $path {
-            Path::Owned(ref $name) => $body,
-            Path::Borrowed(ref $name) => $body,
-            Path::Wrapper(ref v) => {
-                let pointer = v.upgrade().ok_or(ValueError::WeakValue)?;
+            $crate::Path::Owned(ref $name) => $body,
+            $crate::Path::Borrowed(ref $name) => $body,
+            $crate::Path::Wrapper(ref v) => {
+                let pointer = v.upgrade().ok_or($crate::ValueError::WeakValue)?;
                 let handle = pointer.handle();
                 let $name = handle.as_ref();
                 $body

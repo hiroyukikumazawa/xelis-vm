@@ -9,7 +9,7 @@ use iterator::*;
 use constructor::*;
 
 use xelis_bytecode::OpCode;
-use xelis_types::{Path, ValueError, path_as_ref};
+use xelis_types::path_as_ref;
 
 use crate::Context;
 

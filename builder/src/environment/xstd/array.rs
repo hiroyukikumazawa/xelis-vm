@@ -1,4 +1,4 @@
-use xelis_types::{Type, Value};
+use xelis_types::{path_as_ref, Type, Value};
 use xelis_environment::{Context, EnvironmentError, FnInstance, FnParams, FnReturnType};
 use super::EnvironmentBuilder;
 
@@ -28,7 +28,7 @@ fn push(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturn
 }
 
 fn remove(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
-    let index = parameters.remove(0).as_u32()? as usize;
+    let index = path_as_ref!(parameters.remove(0), p, p.as_u32()?) as usize;
 
     let array = zelf?.as_mut_vec()?;
     if index >= array.len() {
@@ -48,8 +48,8 @@ fn pop(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {
 }
 
 fn slice(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
-    let start = parameters.remove(0).as_u32()?;
-    let end = parameters.remove(0).as_u32()?;
+    let start = path_as_ref!(parameters.remove(0), p, p.as_u32()?);
+    let end = path_as_ref!(parameters.remove(0), p, p.as_u32()?);
 
     let vec = zelf?.as_vec()?;
     let len = vec.len() as u32;
@@ -72,14 +72,17 @@ fn slice(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnRetur
 
 fn contains(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let value = parameters.remove(0);
-    let handle = value.as_ref();
-    let expected = handle.as_value();
-    let vec = zelf?.as_vec()?;
-    Ok(Some(Value::Boolean(vec.iter().find(|v| *v.handle() == *expected).is_some())))
+
+    let contains = path_as_ref!(value, value, {
+        let vec = zelf?.as_vec()?;
+        // vec.iter().find(|v| *v.handle() == value).is_some()
+        todo!("contains")
+    });
+    Ok(Some(Value::Boolean(contains)))
 }
 
 fn get(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
-    let index = parameters.remove(0).as_u32()? as usize;
+    let index = path_as_ref!(parameters.remove(0), p, p.as_u32()?) as usize;
     let vec = zelf?.as_mut_vec()?;
     if let Some(value) = vec.get_mut(index) {
         Ok(Some(Value::Optional(Some(value.transform()))))

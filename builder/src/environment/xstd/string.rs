@@ -1,5 +1,5 @@
 use xelis_environment::Context;
-use xelis_types::{Type, Value, ValuePointer};
+use xelis_types::{path_as_ref, Type, Value, ValuePointer};
 use super::{
     FnInstance,
     FnParams,
@@ -42,18 +42,19 @@ fn trim(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {
 
 fn contains(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let param = parameters.remove(0);
-    let handle = param.as_ref();
-    let value = handle.as_string()?;
-    let s: &String = zelf?.as_string()?;
-    Ok(Some(Value::Boolean(s.contains(value))))
+    path_as_ref!(param, p, {
+        let value = p.as_string()?;
+        let s = zelf?.as_string()?;
+        Ok(Some(Value::Boolean(s.contains(value))))
+    })
 }
 
 fn contains_ignore_case(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let param = parameters.remove(0);
-    let handle = param.as_ref();
-    let value = handle.as_string()?.to_lowercase();
-    let s: String = zelf?.as_string()?.to_lowercase();
-    Ok(Some(Value::Boolean(s.contains(&value))))
+
+    let z = zelf?.as_string()?.to_lowercase();
+    let p: String = path_as_ref!(param, p, p.as_string()?.to_lowercase());
+    Ok(Some(Value::Boolean(z.contains(&p))))
 }
 
 fn to_uppercase(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {
@@ -80,9 +81,9 @@ fn to_bytes(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {
 fn index_of(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let s: &String = zelf?.as_string()?;
     let param = parameters.remove(0);
-    let handle = param.as_ref();
-    let value = handle.as_string()?;
-    if let Some(index) = s.find(value) {
+    let index = path_as_ref!(param, p, s.find(p.as_string()?));
+
+    if let Some(index) = index {
         let inner = ValuePointer::owned(Value::U32(index as u32));
         Ok(Some(Value::Optional(Some(inner))))
     } else {
@@ -93,9 +94,8 @@ fn index_of(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnRe
 fn last_index_of(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let s: &String = zelf?.as_string()?;
     let param = parameters.remove(0);
-    let handle = param.as_ref();
-    let value = handle.as_string()?;
-    if let Some(index) = s.rfind(value) {
+    let result = path_as_ref!(param, p, s.rfind(p.as_string()?));
+    if let Some(index) = result {
         let inner = ValuePointer::owned(Value::U32(index as u32));
         Ok(Some(Value::Optional(Some(inner))))
     } else {
@@ -107,45 +107,40 @@ fn replace(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnRet
     let s: &String = zelf?.as_string()?;
     let param1 = parameters.remove(0);
     let param2 = parameters.remove(0);
-    let handle1 = param1.as_ref();
-    let handle2 = param2.as_ref();
-    let old = handle1.as_string()?;
-    let new = handle2.as_string()?;
-    let s = s.replace(old, new);
+
+    let s = path_as_ref!(param1, p1, path_as_ref!(param2, p2, s.replace(p1.as_string()?, p2.as_string()?)));
     Ok(Some(Value::String(s)))
 }
 
 fn starts_with(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let s: &String = zelf?.as_string()?;
     let param = parameters.remove(0);
-    let handle = param.as_ref();
-    let value = handle.as_string()?;
-    Ok(Some(Value::Boolean(s.starts_with(value))))
+    let result = path_as_ref!(param, p, s.starts_with(p.as_string()?));
+    Ok(Some(Value::Boolean(result)))
 }
 
 fn ends_with(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let s: &String = zelf?.as_string()?;
     let param = parameters.remove(0);
-    let handle = param.as_ref();
-    let value = handle.as_string()?;
-    Ok(Some(Value::Boolean(s.ends_with(value))))
+    let result = path_as_ref!(param, p, s.ends_with(p.as_string()?));
+    Ok(Some(Value::Boolean(result)))
 }
 
 fn split(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let s: &String = zelf?.as_string()?;
     let param = parameters.remove(0);
-    let handle = param.as_ref();
-    let value = handle.as_string()?;
-    let values = s.split(value)
-        .map(|s| ValuePointer::owned(Value::String(s.to_string())))
-        .collect();
-
+    let values = path_as_ref!(param, handle, {
+        let value = handle.as_string()?;
+        s.split(value)
+            .map(|s| ValuePointer::owned(Value::String(s.to_string())))
+            .collect()
+    });
     Ok(Some(Value::Array(values)))
 }
 
 fn char_at(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let param =  parameters.remove(0);
-    let index = param.as_u32()? as usize;
+    let index = path_as_ref!(param, p, p.as_u32()?) as usize;
     let s: &String = zelf?.as_string()?;
     if let Some(c) = s.chars().nth(index) {
         let inner = ValuePointer::owned(Value::String(c.to_string()));
@@ -163,16 +158,19 @@ fn is_empty(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {
 fn string_matches(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let s: &String = zelf?.as_string()?;
     let param = parameters.remove(0);
-    let handle = param.as_ref();
-    let value = handle.as_string()?;
-    let m = s.matches(value);
-    Ok(Some(Value::Array(m.map(|s| ValuePointer::owned(Value::String(s.to_string()))).collect())))
+    let values = path_as_ref!(param, handle, {
+        let value = handle.as_string()?;
+        s.matches(value)
+            .map(|s| ValuePointer::owned(Value::String(s.to_string())))
+            .collect()
+    });
+    Ok(Some(Value::Array(values)))
 }
 
 fn string_substring(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let s: &String = zelf?.as_string()?;
     let param = parameters.remove(0);
-    let start = param.as_u32()? as usize;
+    let start = path_as_ref!(param, p, p.as_u32()?) as usize;
     if let Some(s) = s.get(start..) {
         let inner = ValuePointer::owned(Value::String(s.to_owned()));
         Ok(Some(Value::Optional(Some(inner))))
@@ -185,8 +183,8 @@ fn string_substring_range(zelf: FnInstance, mut parameters: FnParams, _: &mut Co
     let s: &String = zelf?.as_string()?;
     let param1 = parameters.remove(0);
     let param2 = parameters.remove(0);
-    let start = param1.as_u32()? as usize;
-    let end = param2.as_u32()? as usize;
+    let start = path_as_ref!(param1, p, p.as_u32()?) as usize;
+    let end = path_as_ref!(param2, p, p.as_u32()?) as usize;
     if let Some(s) = s.get(start..end) {
         let inner = ValuePointer::owned(Value::String(s.to_owned()));
         Ok(Some(Value::Optional(Some(inner))))

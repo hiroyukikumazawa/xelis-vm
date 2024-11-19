@@ -5,7 +5,7 @@ mod integer;
 mod range;
 mod map;
 
-use xelis_types::Type;
+use xelis_types::{path_as_ref, Type};
 use xelis_environment::{
     EnvironmentError,
     FnInstance,
@@ -31,14 +31,14 @@ pub fn register(env: &mut EnvironmentBuilder) {
 
 fn println(_: FnInstance, parameters: FnParams, _: &mut Context) -> FnReturnType {
     let param = &parameters[0];
-    println!("{}", param.as_ref().as_value());
+    path_as_ref!(param, p, println!("{}", p));
 
     Ok(None)
 }
 
 fn debug(_: FnInstance, parameters: FnParams, _: &mut Context) -> FnReturnType {
     let param = &parameters[0];
-    println!("{:?}", param.as_ref().as_value());
+    path_as_ref!(param, p, println!("{:?}", p));
 
     Ok(None)
 }

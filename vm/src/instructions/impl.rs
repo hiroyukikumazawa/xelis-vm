@@ -14,9 +14,8 @@ pub fn constant<'a>(backend: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut 
 
 pub fn memory_load<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let index = manager.read_u16()?;
-    let value = manager.from_register(index as usize)?
-        .weak();
-    stack.push_stack(Path::Wrapper(value))?;
+    let register = manager.from_register(index as usize)?;
+    stack.push_stack(Path::Wrapper(register.weak()))?;
 
     Ok(InstructionResult::Nothing)
 }

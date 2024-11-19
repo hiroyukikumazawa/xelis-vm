@@ -1,5 +1,5 @@
 use xelis_environment::{Context, EnvironmentError, FnInstance, FnParams, FnReturnType};
-use xelis_types::{Type, Value, ValuePointer};
+use xelis_types::{path_as_ref, Type, Value, ValuePointer};
 
 use crate::EnvironmentBuilder;
 
@@ -24,23 +24,26 @@ fn len(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {
 
 fn contains_key(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let key = parameters.remove(0);
-    let k = key.as_ref();
-    if k.is_map() {
-        return Err(EnvironmentError::InvalidKeyType);
-    }
+    let contains = path_as_ref!(key, k, {
+        if k.is_map() {
+            return Err(EnvironmentError::InvalidKeyType);
+        }
+        zelf?.as_map()?
+            .contains_key(&k)
+    });
 
-    let contains = zelf?.as_map()?.contains_key(&k);
     Ok(Some(Value::Boolean(contains)))
 }
 
 fn get(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let key = parameters.remove(0);
-    let k = key.as_ref();
-    if k.is_map() {
-        return Err(EnvironmentError::InvalidKeyType);
-    }
+    let value = path_as_ref!(key, k, {
+        if k.is_map() {
+            return Err(EnvironmentError::InvalidKeyType);
+        }
+        zelf?.as_map()?.get(&k).cloned()
+    });
 
-    let value = zelf?.as_map()?.get(&k).cloned();
     Ok(Some(Value::Optional(value)))
 }
 
@@ -59,13 +62,14 @@ fn insert(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnRetu
 fn remove(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let key = parameters.remove(0);
 
-    let k = key.as_ref();
-    if k.is_map() {
-        return Err(EnvironmentError::InvalidKeyType);
-    }
-
-    let value = zelf?.as_mut_map()?
-        .remove(&k);
+    let value = path_as_ref!(key, k, {
+        if k.is_map() {
+            return Err(EnvironmentError::InvalidKeyType);
+        }
+    
+        zelf?.as_mut_map()?
+            .remove(&k)
+    });
     Ok(Some(Value::Optional(value)))
 }
 
