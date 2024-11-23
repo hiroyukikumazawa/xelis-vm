@@ -43,7 +43,7 @@ fn remove(zelf: FnInstance, mut parameters: FnParams, context: &mut Context) -> 
 
 fn pop(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {
     let array = zelf?.as_mut_vec()?;
-    if let Some(mut value) = array.pop() {
+    if let Some(value) = array.pop() {
         Ok(Some(value.take_value()))
     } else {
         Ok(Some(ValueCell::Optional(None)))

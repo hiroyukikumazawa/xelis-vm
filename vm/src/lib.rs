@@ -11,7 +11,7 @@ use xelis_environment::{Environment, Context};
 use instructions::{InstructionResult, InstructionTable};
 use stack::Stack;
 
-use xelis_types::{EnumType, Path, StructType, ValueType};
+use xelis_types::{EnumType, StructType, ValuePointer, ValueType};
 use xelis_bytecode::Module;
 
 pub use error::VMError;
@@ -73,7 +73,7 @@ pub struct VM<'a> {
     call_stack: Vec<ChunkManager<'a>>,
     // The stack of the VM
     // Every values are stored here
-    stack: Stack<'a>,
+    stack: Stack,
     // Context given to each instruction
     context: Context<'a>,
 }
@@ -100,7 +100,7 @@ impl<'a> VM<'a> {
 
     // Get the stack
     #[inline]
-    pub fn get_stack(&self) -> &Stack<'a> {
+    pub fn get_stack(&self) -> &Stack {
         &self.stack
     }
 
@@ -149,8 +149,8 @@ impl<'a> VM<'a> {
     }
 
     // Invoke a chunk using its id and arguments
-    pub fn invoke_chunk_with_args(&mut self, id: u16, args: Vec<Path<'a>>) -> Result<(), VMError> {
-        self.stack.extend_stack(args.into_iter())?;
+    pub fn invoke_chunk_with_args<V: Into<ValuePointer>, I: Iterator<Item = V> + ExactSizeIterator>(&mut self, id: u16, args: I) -> Result<(), VMError> {
+        self.stack.extend_stack(args.map(|v| v.into()))?;
         self.invoke_chunk_id(id)
     }
 
@@ -163,9 +163,9 @@ impl<'a> VM<'a> {
     }
 
     // Invoke an entry chunk using its id
-    pub fn invoke_entry_chunk_with_args(&mut self, id: u16, args: Vec<Path<'a>>) -> Result<(), VMError> {
+    pub fn invoke_entry_chunk_with_args<V: Into<ValuePointer>, I: Iterator<Item = V> + ExactSizeIterator>(&mut self, id: u16, args: I) -> Result<(), VMError> {
         self.invoke_entry_chunk(id)?;
-        self.stack.extend_stack(args.into_iter())?;
+        self.stack.extend_stack(args.map(|v| v.into()))?;
         Ok(())
     }
 
@@ -194,7 +194,7 @@ impl<'a> VM<'a> {
             return Err(VMError::StackNotCleaned);
         }
 
-        Ok(end_value.into())
+        Ok(end_value.into_value().into())
     }
 }
 

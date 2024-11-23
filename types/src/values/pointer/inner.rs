@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{values::cell::ValueCell, ValueHandle, ValueHandleMut};
+use crate::{values::cell::ValueCell, ValueError, ValueHandle, ValueHandleMut};
 use super::{SubValue, ValuePointer};
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
@@ -80,6 +80,32 @@ impl ValuePointerInner {
         match self {
             Self::Owned(v) => ValueHandleMut::Borrowed(v),
             Self::Shared(v) => ValueHandleMut::RefMut(v.borrow_mut())
+        }
+    }
+
+    // Get a sub value from the value
+    pub fn get_field_at(self, index: usize) -> Result<ValuePointer, ValueError> {
+        match self {
+            Self::Owned(v) => {
+                let mut values = v.to_sub_vec()?;
+                let len = values.len();
+                if index >= len {
+                    return Err(ValueError::OutOfBounds(index, len))
+                }
+
+                let at_index = values.remove(index);
+                Ok(at_index)
+            },
+            Self::Shared(v) => {
+                let mut values = v.borrow_mut();
+                let values = values.as_mut_sub_vec()?;
+                let len = values.len();
+                let at_index = values
+                    .get_mut(index)
+                    .ok_or_else(|| ValueError::OutOfBounds(index, len))?;
+
+                Ok(at_index.transform())
+            }
         }
     }
 }

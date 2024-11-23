@@ -4,11 +4,10 @@ mod inner;
 use std::{
     collections::HashSet,
     hash::{Hash, Hasher},
-    ops::{Deref, DerefMut},
     ptr,
 };
 
-use super::ValueCell;
+use super::{Value, ValueCell, ValueError, ValueHandle, ValueHandleMut, ValueType};
 
 pub use sub_value::SubValue;
 pub use inner::ValuePointerInner;
@@ -38,17 +37,28 @@ impl ValuePointer {
         ptr::from_ref(self.handle().as_value())
     }
 
-    // Take the value, even if it's shared, replace it by Null
-    #[inline(always)]
-    pub fn take_value(&mut self) -> ValueCell {
-        let v = std::mem::take(&mut self.0);
-        v.take_value()
-    }
-
     // Clone the inner value
     #[inline(always)]
     pub fn to_value(&self) -> ValueCell {
         self.handle().as_value().clone()
+    }
+
+    // Get an handle to the value
+    #[inline(always)]
+    pub fn handle<'a>(&'a self) -> ValueHandle<'a> {
+        self.0.handle()
+    }
+
+    // Get a mutable handle to the value
+    #[inline(always)]
+    pub fn handle_mut<'a>(&'a mut self) -> ValueHandleMut<'a> {
+        self.0.handle_mut()
+    }
+
+    // Transform the value pointer into a shared value pointer
+    #[inline(always)]
+    pub fn transform(&mut self) -> Self {
+        self.0.transform()
     }
 }
 
@@ -64,6 +74,18 @@ impl ValuePointer {
     #[inline(always)]
     pub fn into_value(self) -> ValueCell {
         self.0.into_value()
+    }
+
+    // Take the value, even if it's shared, replace it by Null
+    #[inline(always)]
+    pub fn take_value(self) -> ValueCell {
+        self.0.take_value()
+    }
+
+    // Get the field value at a specific index
+    #[inline(always)]
+    pub fn get_field_at(self, index: usize) -> Result<Self, ValueError> {
+        self.0.get_field_at(index)
     }
 }
 
@@ -82,37 +104,38 @@ impl ValuePointer {
         let v = std::mem::take(&mut self.0);
         v.into_value()
     }
-}
 
-impl AsRef<ValuePointerInner> for ValuePointer {
-    fn as_ref(&self) -> &ValuePointerInner {
-        &self.0
+
+    // Take the value, even if it's shared, replace it by Null
+    #[inline(always)]
+    pub fn take_value(&mut self) -> ValueCell {
+        let v = std::mem::take(&mut self.0);
+        v.take_value()
     }
-}
 
-impl AsMut<ValuePointerInner> for ValuePointer {
-    fn as_mut(&mut self) -> &mut ValuePointerInner {
-        &mut self.0
-    }
-}
-
-impl Deref for ValuePointer {
-    type Target = ValuePointerInner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for ValuePointer {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+    // Get the field value at a specific index
+    #[inline(always)]
+    pub fn get_field_at(&mut self, index: usize) -> Result<Self, ValueError> {
+        let v = std::mem::take(&mut self.0);
+        v.get_field_at(index)
     }
 }
 
 impl From<ValueCell> for ValuePointer {
     fn from(value: ValueCell) -> Self {
         Self::owned(value)
+    }
+}
+
+impl From<Value> for ValuePointer {
+    fn from(value: Value) -> Self {
+        Self::owned(value.into())
+    }
+}
+
+impl From<ValueType> for ValuePointer {
+    fn from(value: ValueType) -> Self {
+        Self::owned(value.into())
     }
 }
 

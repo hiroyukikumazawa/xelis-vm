@@ -1,27 +1,28 @@
 use std::collections::VecDeque;
+
 use xelis_types::Path;
 
 use crate::{stack::Stack, Backend, ChunkManager, Context, VMError};
 use super::InstructionResult;
 
 
-pub fn constant<'a>(backend: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
+pub fn constant<'a>(backend: &Backend<'a>, stack: &mut Stack, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let index = manager.read_u16()? as usize;
+    // TODO: keep a cache of already loaded constants so we can just clone them instead of clone + into
     let constant = backend.module.get_constant_at(index).ok_or(VMError::ConstantNotFound)?;
-    stack.push_stack(Path::Owned(constant.clone().into()))?;
+    stack.push_stack(constant.clone().into())?;
     Ok(InstructionResult::Nothing)
 }
 
-pub fn memory_load<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
+pub fn memory_load<'a>(_: &Backend<'a>, stack: &mut Stack, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let index = manager.read_u16()?;
-    let value = manager.from_register(index as usize)?
-        .shareable();
-    stack.push_stack(value)?;
+    let value = manager.from_register(index as usize)?;
+    stack.push_stack(value.transform())?;
 
     Ok(InstructionResult::Nothing)
 }
 
-pub fn memory_set<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
+pub fn memory_set<'a>(_: &Backend<'a>, stack: &mut Stack, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let index = manager.read_u16()?;
     let value = stack.pop_stack()?;
     manager.set_register(index as usize, value);
@@ -29,23 +30,23 @@ pub fn memory_set<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut Chun
     Ok(InstructionResult::Nothing)
 }
 
-pub fn subload<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
+pub fn subload<'a>(_: &Backend<'a>, stack: &mut Stack, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let index = manager.read_u8()?;
     let path = stack.pop_stack()?;
-    let sub = path.get_sub_variable(index as usize)?;
+    let sub = path.get_field_at(index as usize)?;
     stack.push_stack_unchecked(sub);
 
     Ok(InstructionResult::Nothing)
 }
 
-pub fn copy<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, _: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
+pub fn copy<'a>(_: &Backend<'a>, stack: &mut Stack, _: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let value = stack.last_stack()?;
     stack.push_stack(value.clone())?;
 
     Ok(InstructionResult::Nothing)
 }
 
-pub fn copy_n<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
+pub fn copy_n<'a>(_: &Backend<'a>, stack: &mut Stack, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let index = manager.read_u8()?;
     let value = stack.get_stack_at(index as usize)?;
     stack.push_stack(value.clone())?;
@@ -53,24 +54,24 @@ pub fn copy_n<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkMan
     Ok(InstructionResult::Nothing)
 }
 
-pub fn pop<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, _: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
+pub fn pop<'a>(_: &Backend<'a>, stack: &mut Stack, _: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     stack.pop_stack()?;
     Ok(InstructionResult::Nothing)
 }
 
-pub fn pop_n<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
+pub fn pop_n<'a>(_: &Backend<'a>, stack: &mut Stack, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let n = manager.read_u8()?;
     stack.pop_stack_n(n)?;
     Ok(InstructionResult::Nothing)
 }
 
-pub fn swap<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
+pub fn swap<'a>(_: &Backend<'a>, stack: &mut Stack, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let index = manager.read_u8()?;
     stack.swap_stack(index as usize)?;
     Ok(InstructionResult::Nothing)
 }
 
-pub fn swap2<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
+pub fn swap2<'a>(_: &Backend<'a>, stack: &mut Stack, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let index_a = manager.read_u8()?;
     let index_b = manager.read_u8()?;
 
@@ -78,15 +79,15 @@ pub fn swap2<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkMana
     Ok(InstructionResult::Nothing)
 }
 
-pub fn array_call<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, _: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
-    let index = stack.pop_stack()?.into_owned().cast_to_u32()?;
+pub fn array_call<'a>(_: &Backend<'a>, stack: &mut Stack, _: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
+    let index = stack.pop_stack()?.into_value().cast_to_u32()?;
     let value = stack.pop_stack()?;
-    let sub = value.get_sub_variable(index as usize)?;
+    let sub = value.get_field_at(index as usize)?;
     stack.push_stack_unchecked(sub);
     Ok(InstructionResult::Nothing)
 }
 
-pub fn invoke_chunk<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
+pub fn invoke_chunk<'a>(_: &Backend<'a>, stack: &mut Stack, manager: &mut ChunkManager<'a>, _: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let id = manager.read_u16()?;
     let on_value = manager.read_bool()?;
     let mut args = manager.read_u8()? as usize;
@@ -106,14 +107,14 @@ pub fn invoke_chunk<'a>(_: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut Ch
     Ok(InstructionResult::InvokeChunk(id))
 }
 
-pub fn syscall<'a>(backend: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut ChunkManager<'a>, context: &mut Context<'a>) -> Result<InstructionResult, VMError> {
+pub fn syscall<'a>(backend: &Backend<'a>, stack: &mut Stack, manager: &mut ChunkManager<'a>, context: &mut Context<'a>) -> Result<InstructionResult, VMError> {
     let id = manager.read_u16()?;
     let on_value = manager.read_bool()?;
     let args = manager.read_u8()?;
 
     let mut arguments = VecDeque::with_capacity(args as usize);
     for _ in 0..args {
-        arguments.push_front(stack.pop_stack()?);
+        arguments.push_front(Path::Wrapper(stack.pop_stack()?));
     }
 
     let mut on_value = if on_value {
@@ -126,12 +127,12 @@ pub fn syscall<'a>(backend: &Backend<'a>, stack: &mut Stack<'a>, manager: &mut C
         .ok_or(VMError::UnknownSysCall)?;
 
     let mut instance = match on_value.as_mut() {
-        Some(v) => Some(v.as_mut()),
+        Some(v) => Some(v.handle_mut()),
         None => None,
     };
 
     if let Some(v) = f.call_function(instance.as_deref_mut(), arguments.into(), context)? {
-        stack.push_stack(Path::Owned(v))?;
+        stack.push_stack(v.into())?;
     }
 
     Ok(InstructionResult::Nothing)
