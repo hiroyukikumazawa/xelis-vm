@@ -31,29 +31,29 @@ pub fn register(env: &mut EnvironmentBuilder) {
 }
 
 fn println(_: FnInstance, parameters: FnParams, _: &mut Context) -> FnReturnType {
-    let param = &parameters[0];
-    println!("{}", param.as_ref().as_value());
+    let param = parameters[0].handle();
+    println!("{}", param.as_ref());
 
     Ok(None)
 }
 
 fn debug(_: FnInstance, parameters: FnParams, _: &mut Context) -> FnReturnType {
-    let param = &parameters[0];
-    println!("{:?}", param.as_ref().as_value());
+    let param = parameters[0].handle();
+    println!("{:?}", param.as_ref());
 
     Ok(None)
 }
 
 fn panic(_: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let param = parameters.remove(0);
-    let value = param.into_owned();
+    let value = param.into_value();
 
     Err(EnvironmentError::Panic(value))
 }
 
 fn assert(_: FnInstance, parameters: FnParams, _: &mut Context) -> FnReturnType {
-    let param = &parameters[0];
-    let value = param.as_ref().as_bool()?;
+    let param = parameters[0].handle();
+    let value = param.as_bool()?;
 
     if value {
         Ok(None)

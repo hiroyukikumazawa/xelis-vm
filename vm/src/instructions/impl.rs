@@ -1,7 +1,5 @@
 use std::collections::VecDeque;
 
-use xelis_types::Path;
-
 use crate::{stack::Stack, Backend, ChunkManager, Context, VMError};
 use super::InstructionResult;
 
@@ -114,7 +112,7 @@ pub fn syscall<'a>(backend: &Backend<'a>, stack: &mut Stack, manager: &mut Chunk
 
     let mut arguments = VecDeque::with_capacity(args as usize);
     for _ in 0..args {
-        arguments.push_front(Path::Wrapper(stack.pop_stack()?));
+        arguments.push_front(stack.pop_stack()?);
     }
 
     let mut on_value = if on_value {
@@ -123,7 +121,8 @@ pub fn syscall<'a>(backend: &Backend<'a>, stack: &mut Stack, manager: &mut Chunk
         None
     };
 
-    let f = backend.environment.get_functions().get(id as usize)
+    let f = backend.environment.get_functions()
+        .get(id as usize)
         .ok_or(VMError::UnknownSysCall)?;
 
     let mut instance = match on_value.as_mut() {

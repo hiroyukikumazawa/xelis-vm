@@ -23,12 +23,14 @@ fn len(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {
 fn push(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
     let param = parameters.remove(0);
     zelf?.as_mut_vec()?
-        .push(param.into_pointer());
+        .push(param.into_owned());
     Ok(None)
 }
 
-fn remove(zelf: FnInstance, mut parameters: FnParams, context: &mut Context) -> FnReturnType {
-    let index = parameters.remove(0).as_u32()? as usize;
+fn remove(zelf: FnInstance, parameters: FnParams, context: &mut Context) -> FnReturnType {
+    let index = parameters[0]
+        .handle()
+        .as_u32()? as usize;
 
     let array = zelf?.as_mut_vec()?;
     if index >= array.len() {
@@ -50,10 +52,9 @@ fn pop(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {
     }
 }
 
-fn slice(zelf: FnInstance, mut parameters: FnParams, context: &mut Context) -> FnReturnType {
-    let param = parameters.remove(0);
-    let range = param.as_ref();
-    let (start, end, _type) = range.as_range()?;
+fn slice(zelf: FnInstance, parameters: FnParams, context: &mut Context) -> FnReturnType {
+    let param = parameters[0].handle();
+    let (start, end, _type) = param.as_range()?;
 
     if *_type != Type::U32 {
         return Err(EnvironmentError::InvalidParameter)
@@ -84,10 +85,9 @@ fn slice(zelf: FnInstance, mut parameters: FnParams, context: &mut Context) -> F
     Ok(Some(ValueCell::Array(slice)))
 }
 
-fn contains(zelf: FnInstance, mut parameters: FnParams, context: &mut Context) -> FnReturnType {
-    let value = parameters.remove(0);
-    let handle = value.as_ref();
-    let expected = handle.as_value();
+fn contains(zelf: FnInstance, parameters: FnParams, context: &mut Context) -> FnReturnType {
+    let value = parameters[0].handle();
+    let expected = value.as_value();
     let vec = zelf?.as_vec()?;
 
     // we need to go through all elements in the slice, thus we increase the gas usage
@@ -96,8 +96,11 @@ fn contains(zelf: FnInstance, mut parameters: FnParams, context: &mut Context) -
     Ok(Some(Value::Boolean(vec.iter().find(|v| *v.handle() == *expected).is_some()).into()))
 }
 
-fn get(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
-    let index = parameters.remove(0).as_u32()? as usize;
+fn get(zelf: FnInstance, parameters: FnParams, _: &mut Context) -> FnReturnType {
+    let index = parameters[0]
+        .handle()
+        .as_u32()? as usize;
+
     let vec = zelf?.as_mut_vec()?;
     if let Some(value) = vec.get_mut(index) {
         Ok(Some(ValueCell::Optional(Some(value.transform()))))

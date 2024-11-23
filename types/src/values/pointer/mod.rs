@@ -60,6 +60,12 @@ impl ValuePointer {
     pub fn transform(&mut self) -> Self {
         self.0.transform()
     }
+
+    // Verify if its the same pointer
+    #[inline]
+    pub fn is_same_ptr(&self, other: &Self) -> bool {
+        self.handle().as_value() as *const ValueCell == other.handle().as_value() as *const ValueCell
+    }
 }
 
 #[cfg(not(feature = "value_pointer_drop"))]

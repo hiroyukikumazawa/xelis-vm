@@ -69,7 +69,7 @@ fn contains(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnRe
     let zelf = zelf?;
     let (start, end, _type) = zelf.as_range()?;
 
-    let value = value.as_ref();
+    let value = value.handle();
     Ok(Some(match _type {
         Type::U8 => contains!(u8, start, end, value),
         Type::U16 => contains!(u16, start, end, value),

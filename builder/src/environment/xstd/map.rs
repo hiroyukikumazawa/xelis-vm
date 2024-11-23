@@ -22,50 +22,46 @@ fn len(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {
     Ok(Some(Value::U32(len as u32).into()))
 }
 
-fn contains_key(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
-    let key = parameters.remove(0);
-    let k = key.as_ref();
-    if k.is_map() {
+fn contains_key(zelf: FnInstance, parameters: FnParams, _: &mut Context) -> FnReturnType {
+    let key = parameters[0].handle();
+    if key.is_map() {
         return Err(EnvironmentError::InvalidKeyType);
     }
 
-    let contains = zelf?.as_map()?.contains_key(&k);
+    let contains = zelf?.as_map()?.contains_key(key.as_value());
     Ok(Some(Value::Boolean(contains).into()))
 }
 
-fn get(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
-    let key = parameters.remove(0);
-    let k = key.as_ref();
-    if k.is_map() {
+fn get(zelf: FnInstance, parameters: FnParams, _: &mut Context) -> FnReturnType {
+    let key = parameters[0].handle();
+    if key.is_map() {
         return Err(EnvironmentError::InvalidKeyType);
     }
 
-    let value = zelf?.as_map()?.get(&k).cloned();
+    let value = zelf?.as_map()?.get(&key).cloned();
     Ok(Some(ValueCell::Optional(value)))
 }
 
 fn insert(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
-    let key = parameters.remove(0).into_owned();
+    let key = parameters.remove(0).into_value();
     if key.is_map() {
         return Err(EnvironmentError::InvalidKeyType);
     }
 
     let value = parameters.remove(0);
     let previous = zelf?.as_mut_map()?
-        .insert(key, value.into_pointer());
+        .insert(key, value.into_owned());
     Ok(Some(ValueCell::Optional(previous)))
 }
 
-fn remove(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
-    let key = parameters.remove(0);
-
-    let k = key.as_ref();
-    if k.is_map() {
+fn remove(zelf: FnInstance, parameters: FnParams, _: &mut Context) -> FnReturnType {
+    let key = parameters[0].handle();
+    if key.is_map() {
         return Err(EnvironmentError::InvalidKeyType);
     }
 
     let value = zelf?.as_mut_map()?
-        .remove(&k);
+        .remove(&key);
     Ok(Some(ValueCell::Optional(value)))
 }
 
