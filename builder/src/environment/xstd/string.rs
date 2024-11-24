@@ -84,7 +84,7 @@ fn index_of(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnRe
     let value = handle.as_string()?;
     if let Some(index) = s.find(value) {
         let inner = ValuePointer::owned(Value::U32(index as u32).into());
-        Ok(Some(ValueCell::Optional(Some(inner))))
+        Ok(Some(ValueCell::Optional(Some(Box::new(inner)))))
     } else {
         Ok(Some(ValueCell::Optional(None)))
     }
@@ -97,7 +97,7 @@ fn last_index_of(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) ->
     let value = handle.as_string()?;
     if let Some(index) = s.rfind(value) {
         let inner = ValuePointer::owned(Value::U32(index as u32).into());
-        Ok(Some(ValueCell::Optional(Some(inner))))
+        Ok(Some(ValueCell::Optional(Some(Box::new(inner)))))
     } else {
         Ok(Some(ValueCell::Optional(None)))
     }
@@ -149,7 +149,7 @@ fn char_at(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnRet
     let s: &String = zelf?.as_string()?;
     if let Some(c) = s.chars().nth(index) {
         let inner = ValuePointer::owned(Value::String(c.to_string()).into());
-        Ok(Some(ValueCell::Optional(Some(inner))))
+        Ok(Some(ValueCell::Optional(Some(Box::new(inner)))))
     } else {
         Ok(Some(ValueCell::Optional(None)))
     }
@@ -175,7 +175,7 @@ fn string_substring(zelf: FnInstance, mut parameters: FnParams, _: &mut Context)
     let start = param.as_u32()? as usize;
     if let Some(s) = s.get(start..) {
         let inner = ValuePointer::owned(Value::String(s.to_owned()).into());
-        Ok(Some(ValueCell::Optional(Some(inner))))
+        Ok(Some(ValueCell::Optional(Some(Box::new(inner)))))
     } else {
         Ok(Some(ValueCell::Optional(None)))
     }
@@ -189,7 +189,7 @@ fn string_substring_range(zelf: FnInstance, mut parameters: FnParams, _: &mut Co
     let end = param2.as_u32()? as usize;
     if let Some(s) = s.get(start..end) {
         let inner = ValuePointer::owned(Value::String(s.to_owned()).into());
-        Ok(Some(ValueCell::Optional(Some(inner))))
+        Ok(Some(ValueCell::Optional(Some(Box::new(inner)))))
     } else {
         Ok(Some(ValueCell::Optional(None)))
     }

@@ -41,7 +41,7 @@ fn get(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnT
     }
 
     let value = zelf?.as_map()?.get(&k).cloned();
-    Ok(Some(ValueCell::Optional(value)))
+    Ok(Some(ValueCell::Optional(value.map(Box::new))))
 }
 
 fn insert(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
@@ -53,7 +53,7 @@ fn insert(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnRetu
     let value = parameters.remove(0);
     let previous = zelf?.as_mut_map()?
         .insert(key, value.into_pointer());
-    Ok(Some(ValueCell::Optional(previous)))
+    Ok(Some(ValueCell::Optional(previous.map(Box::new))))
 }
 
 fn remove(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnType {
@@ -66,7 +66,7 @@ fn remove(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnRetu
 
     let value = zelf?.as_mut_map()?
         .remove(&k);
-    Ok(Some(ValueCell::Optional(value)))
+    Ok(Some(ValueCell::Optional(value.map(Box::new))))
 }
 
 fn clear(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {

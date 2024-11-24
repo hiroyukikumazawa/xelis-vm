@@ -24,7 +24,7 @@ macro_rules! overflow_fn {
                     ValueCell::Optional(None)
                 } else {
                     let inner = ValuePointer::owned(Value::$t(result).into());
-                    ValueCell::Optional(Some(inner))
+                    ValueCell::Optional(Some(Box::new(inner)))
                 }))
             }
 

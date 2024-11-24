@@ -100,7 +100,7 @@ fn get(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnT
     let index = parameters.remove(0).as_u32()? as usize;
     let vec = zelf?.as_mut_vec()?;
     if let Some(value) = vec.get_mut(index) {
-        Ok(Some(ValueCell::Optional(Some(value.transform()))))
+        Ok(Some(ValueCell::Optional(Some(Box::new(value.transform())))))
     } else {
         Ok(Some(ValueCell::Optional(None)))
     }
@@ -109,7 +109,7 @@ fn get(zelf: FnInstance, mut parameters: FnParams, _: &mut Context) -> FnReturnT
 fn first(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {
     let vec = zelf?.as_mut_vec()?;
     if let Some(value) = vec.first_mut() {
-        Ok(Some(ValueCell::Optional(Some(value.transform()))))
+        Ok(Some(ValueCell::Optional(Some(Box::new(value.transform())))))
     } else {
         Ok(Some(ValueCell::Optional(None)))
     }
@@ -118,7 +118,7 @@ fn first(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {
 fn last(zelf: FnInstance, _: FnParams, _: &mut Context) -> FnReturnType {
     let vec = zelf?.as_mut_vec()?;
     if let Some(value) = vec.last_mut() {
-        Ok(Some(ValueCell::Optional(Some(value.transform()))))
+        Ok(Some(ValueCell::Optional(Some(Box::new(value.transform())))))
     } else {
         Ok(Some(ValueCell::Optional(None)))
     }

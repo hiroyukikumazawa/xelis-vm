@@ -23,7 +23,7 @@ impl ValuePointer {
     // Create a new value pointer from a value
     #[inline(always)]
     pub fn owned(value: ValueCell) -> Self {
-        Self(ValuePointerInner::Owned(Box::new(value)))
+        Self(ValuePointerInner::Owned(value))
     }
 
     // Create a shared value pointer

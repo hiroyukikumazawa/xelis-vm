@@ -13,7 +13,7 @@ pub enum ValueCell {
     Default(Value),
     Struct(Vec<ValuePointer>, StructType),
     Array(Vec<ValuePointer>),
-    Optional(Option<ValuePointer>),
+    Optional(Option<Box<ValuePointer>>),
 
     // Map cannot be used as a key in another map
     Map(HashMap<ValueCell, ValuePointer>),
@@ -44,7 +44,7 @@ impl From<ValueType> for ValueCell {
             ValueType::Default(v) => Self::Default(v),
             ValueType::Struct(fields, _type) => Self::Struct(fields.into_iter().map(|v| ValuePointer::owned(v.into())).collect(), _type),
             ValueType::Array(values) => Self::Array(values.into_iter().map(|v| ValuePointer::owned(v.into())).collect()),
-            ValueType::Optional(value) => Self::Optional(value.map(|v| ValuePointer::owned((*v).into()))),
+            ValueType::Optional(value) => Self::Optional(value.map(|v| Box::new(ValuePointer::owned((*v).into())))),
             ValueType::Map(map) => Self::Map(map.into_iter().map(|(k, v)| (k.into(), ValuePointer::owned(v.into()))).collect()),
             ValueType::Enum(fields, _type) => Self::Enum(fields.into_iter().map(|v| ValuePointer::owned(v.into())).collect(), _type)
         }
@@ -223,7 +223,7 @@ impl ValueCell {
     pub fn as_optional(&self, expected: &Type) -> Result<Option<&ValuePointer>, ValueError> {
         match self {
             Self::Default(Value::Null) => Ok(None),
-            Self::Optional(n) => Ok(n.as_ref()),
+            Self::Optional(n) => Ok(n.as_ref().map(|v| v.as_ref())),
             v => Err(ValueError::InvalidValueCell(v.clone(), Type::Optional(Box::new(expected.clone()))))
         }
     }
@@ -231,7 +231,7 @@ impl ValueCell {
     #[inline]
     pub fn take_from_optional(&mut self, expected: &Type) -> Result<ValuePointer, ValueError> {
         match self {
-            Self::Optional(opt) => opt.take().ok_or(ValueError::OptionalIsNull),
+            Self::Optional(opt) => opt.take().map(|v| *v).ok_or(ValueError::OptionalIsNull),
             v => Err(ValueError::InvalidValueCell(v.clone(), Type::Optional(Box::new(expected.clone()))))
         }
     }
@@ -239,7 +239,7 @@ impl ValueCell {
     #[inline]
     pub fn take_optional(&mut self) -> Result<Option<ValuePointer>, ValueError> {
         match self {
-            Self::Optional(opt) => Ok(opt.take()),
+            Self::Optional(opt) => Ok(opt.take().map(|v| *v)),
             v => Err(ValueError::InvalidValueCell(v.clone(), Type::Optional(Box::new(Type::Any))))
         }
     }

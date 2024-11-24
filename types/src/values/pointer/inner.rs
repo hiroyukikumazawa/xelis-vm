@@ -5,13 +5,13 @@ use super::{SubValue, ValuePointer};
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum ValuePointerInner {
-    Owned(Box<ValueCell>),
+    Owned(ValueCell),
     Shared(SubValue)
 }
 
 impl Default for ValuePointerInner {
     fn default() -> Self {
-        Self::Owned(Box::new(Default::default()))
+        Self::Owned(Default::default())
     }
 }
 
@@ -21,7 +21,7 @@ impl ValuePointerInner {
     // if it can't be taken, replace it by Value::Null
     pub fn take_value(self) -> ValueCell {
         match self {
-            Self::Owned(v) => *v,
+            Self::Owned(v) => v,
             Self::Shared(v) => match Rc::try_unwrap(v.into_inner()) {
                 Ok(value) => value.into_inner(),
                 Err(rc) => {
@@ -35,7 +35,7 @@ impl ValuePointerInner {
     // Get the inner value, or clone it if it's shared
     pub fn into_value(self) -> ValueCell {
         match self {
-            Self::Owned(v) => *v,
+            Self::Owned(v) => v,
             Self::Shared(v) => match Rc::try_unwrap(v.into_inner()) {
                 Ok(value) => value.into_inner(),
                 Err(rc) => rc.borrow().clone()
@@ -47,10 +47,10 @@ impl ValuePointerInner {
     pub fn into_owned(self) -> ValuePointer {
         ValuePointer(match self {
             Self::Owned(_) => self,
-            Self::Shared(v) => Self::Owned(Box::new(match Rc::try_unwrap(v.into_inner()) {
+            Self::Shared(v) => Self::Owned(match Rc::try_unwrap(v.into_inner()) {
                 Ok(value) => value.into_inner(),
                 Err(rc) => rc.borrow().clone()
-            }))
+            })
         })
     }
 
@@ -59,7 +59,7 @@ impl ValuePointerInner {
         ValuePointer(match self {
             Self::Owned(v) => {
                 let dst = std::mem::take(v);
-                let shared = Self::Shared(SubValue::new(*dst));
+                let shared = Self::Shared(SubValue::new(dst));
                 *self = shared.clone();
                 shared
             },
